@@ -86,7 +86,14 @@ export default function AdminDashboard() {
             if (newItem.image) {
                 const formData = new FormData();
                 formData.append('file', newItem.image);
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const password = prompt("Enter Admin Password to Upload Image:");
+                if (!password) { setUploading(false); return; }
+
+                const res = await fetch('/api/upload', { 
+                    method: 'POST', 
+                    headers: { 'x-admin-password': password },
+                    body: formData 
+                });
                 if (!res.ok) throw new Error('Upload failed');
                 imageUrl = (await res.json()).url;
             }
@@ -161,7 +168,7 @@ export default function AdminDashboard() {
             if (!confirm(`Warning: Account balance ($${stockAcc.balance.toFixed(2)}) is less than cost ($${usdCost.toFixed(2)}). Continue anyway?`)) return;
         }
 
-        if (confirmPassword !== "car123los.") { alert("Wrong password"); return; }
+
 
         try {
             // 1. Deduct balance via Google Sheets API
@@ -170,7 +177,10 @@ export default function AdminDashboard() {
             // Call API to update sheet
             const res = await fetch('/api/stock', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-admin-password': confirmPassword 
+                },
                 body: JSON.stringify({ rowIndex: stockAcc.rowIndex, newBalance }),
             });
             
@@ -187,6 +197,19 @@ export default function AdminDashboard() {
                 usdCost: usdCost,
                 exchangeRateUsed: manualExchangeRate
             });
+
+            // Send Telegram Notification
+            fetch('/api/telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'order_complete',
+                    orderCode: processingOrder.orderCode || processingOrder.id.slice(0,8),
+                    productName: processingOrder.productName,
+                    username: processingOrder.username,
+                    processedBy: stockAcc.email
+                }),
+            }).catch(e => console.error('Telegram notification failed', e));
 
             setProcessingOrder(null);
             setConfirmPassword('');
@@ -226,9 +249,15 @@ export default function AdminDashboard() {
                 ? { rowIndex: stockForm.rowIndex, newBalance: Number(stockForm.balance) }
                 : { email: stockForm.email, balance: Number(stockForm.balance) };
 
+            const password = prompt("Enter Admin Password to Save Stock:");
+            if (!password) { setIsStockSubmitting(false); return; }
+
             const res = await fetch('/api/stock', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-admin-password': password
+                },
                 body: JSON.stringify(payload),
             });
 

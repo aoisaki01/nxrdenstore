@@ -3,6 +3,11 @@ import cloudinary from '@/lib/cloudinary';
 
 export async function POST(request) {
     try {
+        const password = request.headers.get('x-admin-password');
+        if (password !== process.env.ADMIN_PASSWORD) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const formData = await request.formData();
         const file = formData.get('file');
 

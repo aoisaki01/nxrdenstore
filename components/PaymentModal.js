@@ -59,6 +59,7 @@ export default function PaymentModal({ isOpen, onClose, product }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    type: 'new_order',
                     orderCode,
                     productName: product.name,
                     price: product.price,

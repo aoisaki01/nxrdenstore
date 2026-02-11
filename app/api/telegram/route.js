@@ -1,26 +1,49 @@
 export async function POST(request) {
     try {
-        const order = await request.json();
+        const body = await request.json();
+        const { type = 'new_order', ...data } = body;
 
-        const BOT_TOKEN = '8284337758:AAF1GIzNnAYkrRu12xbYaOb-QfpdalqyFZk';
-        const CHAT_ID = '-1003622499227';
+        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-        const message = [
-            `*Website Order*`,
-            `🧾 *Order Code:* \`${order.orderCode}\``,
-            ``,
-            `📦 *Product:* ${order.productName}`,
-            `💰 *Price:* Rp ${Number(order.price).toLocaleString('id-ID')}`,
-            `📁 *Category:* ${order.category || 'Regular'}`,
-            ``,
-            `👤 *Username:* \`${order.username}\``,
-            `🔑 *Password:* \`${order.password}\``,
-            order.backupCode ? `🔐 *Backup Code:* \`${order.backupCode}\`` : '',
-            `📱 *WhatsApp:* \`${order.whatsapp}\``,
-            ``,
-            `⏰ *Time:* ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
-            `📌 *Status:* PENDING`,
-        ].filter(Boolean).join('\n');
+        if (!BOT_TOKEN || !CHAT_ID) {
+            return Response.json({ error: 'Telegram configuration missing' }, { status: 500 });
+        }
+
+        let message = '';
+
+        if (type === 'new_order') {
+            message = [
+                `*🛍️ New Order Received!*`,
+                `🧾 *Code:* \`${data.orderCode}\``,
+                ``,
+                `📦 *Product:* ${data.productName}`,
+                `💰 *Price:* Rp ${Number(data.price).toLocaleString('id-ID')}`,
+                `📁 *Category:* ${data.category || 'Regular'}`,
+                ``,
+                `👤 *Username:* \`${data.username}\``,
+                `🔑 *Password:* \`${data.password}\``,
+                data.backupCode ? `🔐 *Backup:* \`${data.backupCode}\`` : '',
+                `📱 *WhatsApp:* \`${data.whatsapp}\``,
+                ``,
+                `⏰ *Time:* ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
+                `⏳ *Status:* PENDING`,
+            ].filter(Boolean).join('\n');
+        } else if (type === 'order_complete') {
+            message = [
+                `*✅ Order Completed!*`,
+                `🧾 *Code:* \`${data.orderCode}\``,
+                ``,
+                `📦 *Product:* ${data.productName}`,
+                `👤 *Username:* \`${data.username}\``,
+                ``,
+                `👮 *Processed By:* ${data.processedBy}`,
+                `⏰ *Time:* ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
+                `🎉 *Status:* DONE`,
+            ].filter(Boolean).join('\n');
+        } else {
+            return Response.json({ error: 'Invalid notification type' }, { status: 400 });
+        }
 
         const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -32,10 +55,10 @@ export async function POST(request) {
             }),
         });
 
-        const data = await res.json();
+        const resData = await res.json();
 
-        if (!data.ok) {
-            console.error('Telegram API error:', data);
+        if (!resData.ok) {
+            console.error('Telegram API error:', resData);
             return Response.json({ error: 'Telegram send failed' }, { status: 500 });
         }
 
