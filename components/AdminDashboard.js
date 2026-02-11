@@ -86,12 +86,12 @@ export default function AdminDashboard() {
             if (newItem.image) {
                 const formData = new FormData();
                 formData.append('file', newItem.image);
-                const password = prompt("Enter Admin Password to Upload Image:");
-                if (!password) { setUploading(false); return; }
+                if (!auth.currentUser) { alert("Please login first"); setUploading(false); return; }
+                const token = await auth.currentUser.getIdToken();
 
                 const res = await fetch('/api/upload', { 
                     method: 'POST', 
-                    headers: { 'x-admin-password': password },
+                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData 
                 });
                 if (!res.ok) throw new Error('Upload failed');
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
         setManualExchangeRate(exchangeRate);
         setSelectedStockId('');
     };
-
+    
     const [confirmPassword, setConfirmPassword] = useState('');
 
     const confirmProcessOrder = async () => {
@@ -175,11 +175,16 @@ export default function AdminDashboard() {
             const newBalance = stockAcc.balance - usdCost;
             
             // Call API to update sheet
+            // Call API to update sheet
+            if (!auth.currentUser) throw new Error("Not logged in");
+            const token = await auth.currentUser.getIdToken();
+
             const res = await fetch('/api/stock', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'x-admin-password': confirmPassword 
+                    'Authorization': `Bearer ${token}`,
+                    'x-process-secret': confirmPassword
                 },
                 body: JSON.stringify({ rowIndex: stockAcc.rowIndex, newBalance }),
             });
@@ -198,22 +203,25 @@ export default function AdminDashboard() {
                 exchangeRateUsed: manualExchangeRate
             });
 
-            // Send Telegram Notification
-            fetch('/api/telegram', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'order_complete',
-                    orderCode: processingOrder.orderCode || processingOrder.id.slice(0,8),
-                    productName: processingOrder.productName,
-                    username: processingOrder.username,
-                    processedBy: stockAcc.email
-                }),
-            }).catch(e => console.error('Telegram notification failed', e));
+            try {
+                await fetch('/api/telegram', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        order: processingOrder,
+                        stockAccount: stockAcc.email,
+                        usdCost: usdCost,
+                        exchangeRate: manualExchangeRate
+                    })
+                });
+            } catch (tgError) { console.error("Telegram notification failed", tgError); }
 
             setProcessingOrder(null);
             setConfirmPassword('');
-            alert("Order processed! Stock deducted from Google Sheet.");
+            alert("Order processed! Stock deducted & Notification Sent.");
         } catch (e) { alert("Error processing: " + e.message); }
     };
 
@@ -249,14 +257,14 @@ export default function AdminDashboard() {
                 ? { rowIndex: stockForm.rowIndex, newBalance: Number(stockForm.balance) }
                 : { email: stockForm.email, balance: Number(stockForm.balance) };
 
-            const password = prompt("Enter Admin Password to Save Stock:");
-            if (!password) { setIsStockSubmitting(false); return; }
+            if (!auth.currentUser) throw new Error("Not logged in");
+            const token = await auth.currentUser.getIdToken();
 
             const res = await fetch('/api/stock', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'x-admin-password': password
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(payload),
             });
@@ -461,9 +469,9 @@ export default function AdminDashboard() {
                             </div>
                             
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Confirm Password</label>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Confirm Password (overhaul666)</label>
                                 <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-violet-500 outline-none" placeholder="Enter admin password" />
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-violet-500 outline-none" placeholder="Enter process password" />
                             </div>
 
                             <button onClick={confirmProcessOrder}

@@ -1,70 +1,104 @@
+import { NextResponse } from 'next/server';
+
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { type = 'new_order', ...data } = body;
+        const { event, order, stockAccount, usdCost, exchangeRate } = body;
 
-        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+        // AUTHENTICATION STRATEGY
+        // - 'new_order': Public (No Auth required) - for customers
+        // - 'processed': Protected (Token required) - for admins
+        
+        if (event !== 'new_order') {
+             const authHeader = request.headers.get('Authorization');
+             const token = authHeader && authHeader.split(' ')[1];
+             
+             const { verifyFirebaseToken } = await import('@/lib/auth-server');
+             const user = await verifyFirebaseToken(token);
+     
+             if (!user) {
+                  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+             }
+        }
 
-        if (!BOT_TOKEN || !CHAT_ID) {
-            return Response.json({ error: 'Telegram configuration missing' }, { status: 500 });
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        const chatId = process.env.TELEGRAM_CHAT_ID;
+
+        if (!botToken || !chatId) {
+            console.error("Telegram config missing");
+            return NextResponse.json({ error: 'Telegram configuration missing' }, { status: 500 });
         }
 
         let message = '';
 
-        if (type === 'new_order') {
-            message = [
-                `*🛍️ New Order Received!*`,
-                `🧾 *Code:* \`${data.orderCode}\``,
-                ``,
-                `📦 *Product:* ${data.productName}`,
-                `💰 *Price:* Rp ${Number(data.price).toLocaleString('id-ID')}`,
-                `📁 *Category:* ${data.category || 'Regular'}`,
-                ``,
-                `👤 *Username:* \`${data.username}\``,
-                `🔑 *Password:* \`${data.password}\``,
-                data.backupCode ? `🔐 *Backup:* \`${data.backupCode}\`` : '',
-                `📱 *WhatsApp:* \`${data.whatsapp}\``,
-                ``,
-                `⏰ *Time:* ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
-                `⏳ *Status:* PENDING`,
-            ].filter(Boolean).join('\n');
-        } else if (type === 'order_complete') {
-            message = [
-                `*✅ Order Completed!*`,
-                `🧾 *Code:* \`${data.orderCode}\``,
-                ``,
-                `📦 *Product:* ${data.productName}`,
-                `👤 *Username:* \`${data.username}\``,
-                ``,
-                `👮 *Processed By:* ${data.processedBy}`,
-                `⏰ *Time:* ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
-                `🎉 *Status:* DONE`,
-            ].filter(Boolean).join('\n');
+        if (event === 'new_order') {
+            // Format for New Order (Customer Side)
+            /*
+            blur transaksi
+            🛒 Web Site
+            Receipt Order Code: ...
+            */
+            const { orderCode, productName, price, category, username, password, backupCode, whatsapp } = body;
+            const timeString = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+
+            message = `
+blur transaksi
+🛒 *Web Site*
+🧾 *Order Code:* \`${orderCode}\`
+📦 *Product:* ${productName}
+💰 *Price:* Rp ${Number(price).toLocaleString('id-ID')}
+Bg *Category:* ${category}
+👤 *Username:* \`${username}\`
+🔑 *Password:* \`${password}\`
+${backupCode ? `🔐 *Backup Code:* \`${backupCode}\`\n` : ''}
+⏰ *Time:* ${timeString}
+📌 *Status:* PENDING
+            `.trim();
+
         } else {
-            return Response.json({ error: 'Invalid notification type' }, { status: 400 });
+            // Format for Processed Order (Admin Side)
+            if (!order) return NextResponse.json({ error: 'Missing order details' }, { status: 400 });
+
+            message = `
+✅ *ORDER PROCESSED*
+
+📦 *Item:* ${order.productName}
+Rp ${order.price?.toLocaleString('id-ID')}
+
+👤 *Customer:* ${order.username}
+🔐 *Pass:* ${order.password}
+${order.backupCode ? `🔏 *Backup:* \`${order.backupCode}\`\n` : ''}
+📱 *WhatsApp:* ${order.whatsapp || '-'}
+
+---
+💰 *Internal Cost:* $${usdCost?.toFixed(2)} (Rate: ${exchangeRate})
+📧 *Processed via:* ${stockAccount}
+            `.trim();
         }
 
-        const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        // Send to Telegram
+        const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        const res = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                chat_id: CHAT_ID,
+                chat_id: chatId,
                 text: message,
-                parse_mode: 'Markdown',
-            }),
+                parse_mode: 'Markdown'
+            })
         });
 
-        const resData = await res.json();
+        const telegramData = await res.json();
 
-        if (!resData.ok) {
-            console.error('Telegram API error:', resData);
-            return Response.json({ error: 'Telegram send failed' }, { status: 500 });
+        if (!telegramData.ok) {
+            console.error("Telegram Error:", telegramData);
+            return NextResponse.json({ error: 'Failed to send to Telegram', details: telegramData }, { status: 500 });
         }
 
-        return Response.json({ success: true });
+        return NextResponse.json({ success: true });
+
     } catch (error) {
-        console.error('Telegram notification error:', error);
-        return Response.json({ error: error.message }, { status: 500 });
+        console.error("Telegram API Error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

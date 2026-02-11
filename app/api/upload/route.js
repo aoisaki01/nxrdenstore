@@ -3,9 +3,14 @@ import cloudinary from '@/lib/cloudinary';
 
 export async function POST(request) {
     try {
-        const password = request.headers.get('x-admin-password');
-        if (password !== process.env.ADMIN_PASSWORD) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const authHeader = request.headers.get('Authorization');
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        const { verifyFirebaseToken } = await import('@/lib/auth-server');
+        const user = await verifyFirebaseToken(token);
+
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized: Invalid Token' }, { status: 401 });
         }
 
         const formData = await request.formData();
