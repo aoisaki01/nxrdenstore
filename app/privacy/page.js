@@ -86,7 +86,7 @@ export default function Privacy() {
                     <section>
                         <h2 className="text-base font-semibold text-slate-900 mb-3">8. Contact</h2>
                         <p>
-                            For privacy-related inquiries, contact us at <a href="mailto:zaidaan1337@gmail.com" className="text-violet-600 hover:underline">zaidaan1337@gmail.com</a> or through our <a href="/contact" className="text-violet-600 hover:underline">Contact page</a>.
+                            For privacy-related inquiries, contact us at <a href="mailto:noxzzl04@gmail.com" className="text-violet-600 hover:underline">noxzzl04@gmail.com</a> or through our <a href="/contact" className="text-violet-600 hover:underline">Contact page</a>.
                         </p>
                     </section>
                 </div>

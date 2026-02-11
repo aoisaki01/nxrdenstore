@@ -1,31 +1,52 @@
+'use client';
+
 import Navbar from '@/components/Navbar';
 import { Mail, MessageCircle, Phone, Instagram } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { database } from '@/lib/firebase';
+import { ref, onValue } from 'firebase/database';
 
 export default function Contact() {
+    const [contacts, setContacts] = useState({
+        email: 'noxzzl04@gmail.com',
+        whatsapp: '087882924651',
+        instagram: 'instagram.com/nxrden.store',
+        telegram: 'directionalblur'
+    });
+
+    useEffect(() => {
+        const unsubscribe = onValue(ref(database, 'config/contacts'), (snapshot) => {
+            if (snapshot.exists()) {
+                setContacts(snapshot.val());
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
     const channels = [
         {
             icon: <Mail size={20} />,
             label: 'Email',
-            value: 'zaidaan1337@gmail.com',
-            href: 'mailto:zaidaan1337@gmail.com',
+            value: contacts.email,
+            href: `mailto:${contacts.email}`,
         },
         {
             icon: <Phone size={20} />,
             label: 'WhatsApp',
-            value: '+62 857-9371-9676',
-            href: 'https://wa.me/6285793719676',
+            value: contacts.whatsapp,
+            href: `https://wa.me/${contacts.whatsapp.replace(/[^0-9]/g, '')}`,
         },
         {
             icon: <Instagram size={20} />,
             label: 'Instagram',
-            value: '@zaid44nn',
-            href: 'https://www.instagram.com/zaid44nn',
+            value: contacts.instagram.replace('https://', '').replace('instagram.com/', '@'),
+            href: contacts.instagram.startsWith('http') ? contacts.instagram : `https://${contacts.instagram}`,
         },
         {
             icon: <MessageCircle size={20} />,
-            label: 'Discord',
-            value: 'Chat on Discord',
-            href: 'https://discord.com/users/529168872696446988',
+            label: 'Telegram',
+            value: contacts.telegram,
+            href: `https://t.me/${contacts.telegram.replace('@', '')}`,
         },
     ];
 

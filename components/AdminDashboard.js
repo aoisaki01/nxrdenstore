@@ -22,6 +22,12 @@ export default function AdminDashboard() {
     const [rates, setRates] = useState({ rate5Days: 95, rateGamepass: 120 });
     const [exchangeRate, setExchangeRate] = useState(16000); // IDR to USD
     const [popupConfig, setPopupConfig] = useState({ enabled: true, title: '', message: '' });
+    const [contactInfo, setContactInfo] = useState({
+        whatsapp: '087882924651',
+        instagram: 'instagram.com/nxrden.store',
+        email: 'noxzzl04@gmail.com',
+        telegram: 'directionalblur'
+    });
     
     // Stock Management State
     const [isStockModalOpen, setIsStockModalOpen] = useState(false);
@@ -48,7 +54,8 @@ export default function AdminDashboard() {
             // Removed stock_accounts ref, fetching from API below
             { ref: ref(database, 'config/rates'), setter: (data) => { if (data) setRates(data); } },
             { ref: ref(database, 'config/exchangeRate'), setter: (data) => { if (data) { setExchangeRate(data); setManualExchangeRate(data); } } },
-            { ref: ref(database, 'config/popup'), setter: (data) => { if (data) setPopupConfig(data); } }
+            { ref: ref(database, 'config/popup'), setter: (data) => { if (data) setPopupConfig(data); } },
+            { ref: ref(database, 'config/contacts'), setter: (data) => { if (data) setContactInfo(data); } }
         ];
 
         const unsubs = refs.map(({ ref, setter }) => onValue(ref, (snap) => setter(snap.val())));
@@ -236,6 +243,16 @@ export default function AdminDashboard() {
             alert(error.message);
         } finally {
             setIsStockSubmitting(false);
+        }
+    };
+
+    const handleSaveContactInfo = async (e) => {
+        e.preventDefault();
+        try {
+            await set(ref(database, 'config/contacts'), contactInfo);
+            alert('Contact Info Updated!');
+        } catch (error) {
+            alert('Error updating contact info: ' + error.message);
         }
     };
 
@@ -572,6 +589,41 @@ export default function AdminDashboard() {
                     <input placeholder="Title" value={popupConfig.title} onChange={e => setPopupConfig({...popupConfig, title: e.target.value})} className="w-full border rounded-lg p-2.5 mb-3" />
                     <textarea placeholder="Message" value={popupConfig.message} onChange={e => setPopupConfig({...popupConfig, message: e.target.value})} className="w-full border rounded-lg p-2.5 mb-3 h-24" />
                     <button onClick={handleUpdatePopup} className="w-full bg-violet-600 text-white font-bold py-2.5 rounded-lg">Save Popup</button>
+                </div>
+            )}
+            {/* --- CONTACT VIEW --- */}
+            {view === 'contact' && (
+                <div className="max-w-2xl">
+                    <div className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                             Contact Settings
+                        </h3>
+                        <form onSubmit={handleSaveContactInfo} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500">WhatsApp (Number only, e.g. 08...)</label>
+                                <input type="text" value={contactInfo.whatsapp} onChange={e => setContactInfo({...contactInfo, whatsapp: e.target.value})}
+                                    className="w-full border rounded-lg p-3 mt-1" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500">Instagram (Link or Username)</label>
+                                <input type="text" value={contactInfo.instagram} onChange={e => setContactInfo({...contactInfo, instagram: e.target.value})}
+                                    className="w-full border rounded-lg p-3 mt-1" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500">Email</label>
+                                <input type="text" value={contactInfo.email} onChange={e => setContactInfo({...contactInfo, email: e.target.value})}
+                                    className="w-full border rounded-lg p-3 mt-1" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500">Telegram (Username)</label>
+                                <input type="text" value={contactInfo.telegram} onChange={e => setContactInfo({...contactInfo, telegram: e.target.value})}
+                                    className="w-full border rounded-lg p-3 mt-1" />
+                            </div>
+                            <button className="w-full py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-700 transition">
+                                Save Contact Info
+                            </button>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>
